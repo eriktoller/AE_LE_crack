@@ -1,31 +1,27 @@
 # AE_LE_crack
-An analytic element for a crack in a linear elastic half-space
-
-# Stress and Displacement Calculator
-A program which calculated the stress field for given functions and grid. The input files for the plot properties and the physical constants are provided through the MATLAB program `bin_write.m` and the program `bin_read.m` can be sued to plot the results calculated by `stress_field_calculator.cpp`.
+An analytic element for a crack in a linear elastic half-space. A program which calculated the stress field for given number of cracks in a uniform stress field. The input files for the plot properties and the physical constants are provided through the MATLAB program `bin_write.m` and the program `bin_read.m` can be used to plot the results calculated by `AE_LE_master.cpp`.
 
 At the moment the programs does not sync automatically and must be manually run in both MATLAB and the preferred C++ editor. Also, the function for the stresses are coded in the C++ file and changing these, or appending new functions, requires changes in the main code. 
 
-The program now includes the analytic element for gravity, and it produces the Cartesian stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{11}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{22}"/>  & <img src="https://latex.codecogs.com/gif.latex?\sigma_{12}"/> ), the principal stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{1}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>  & <img src="https://latex.codecogs.com/gif.latex?\theta_{p}"/> ) and the principal stress trajectories. Also, it computes the displacement filed <img src="https://latex.codecogs.com/gif.latex?w"/> and the displacement trajectories. For a given resolution and coordinates.
+The program includes the Cartesian stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{11}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{22}"/>  & <img src="https://latex.codecogs.com/gif.latex?\sigma_{12}"/> ), the principal stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{1}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>  & <img src="https://latex.codecogs.com/gif.latex?\theta_{p}"/> ) and the principal stress trajectories. Also, it computes the displacement filed <img src="https://latex.codecogs.com/gif.latex?w"/> and the displacement trajectories. For a given resolution and coordinates.
 
 A log file, `log.txt`, is created with all the variable data and time stamp.
 
-This program has been developed using *Microsoft Visual Stuido* and only the `.cpp` file is included in the repository. 
+This program has been developed using *Microsoft Visual Stuido* and only the `.cpp` file is included in the repository. The solution also uses the Eigen library (Guennebaud & Jacob, 2010)
 
 ## Instructions
 To generate plot for stresses filed (here only for gravity at the moment) follow the following procedure:
 1. Run `bin_write.m`
    - Generates the input data and plot data in `input_data.bin` and `plot_data.bin`.
-2. Run `sw_calculator_code.cpp`
-   - Calculates the stress fields and provide them in `data.bin` and the dimensions in `dim_data.bin`.
+2. Run `AE_LE_master.cpp`
+   - Solves for the coefficients and calcualtes the stress fields and provide them in `data.bin` and the dimensions in `dim_data.bin`.
 3. Run `bin_read.m`
    - Reads the data and plots the stress fields.
    
 ## Included
 The program inludes several analytic element for linear elasticity. Currently the following anlaytic elements are included:
-- gravity,
-- cracks (not yet released) and
-- circular tunnel (not yet released).
+- uniform stress and
+- cracks.
 
 ## Input data
 This list contains all the definitions of the user input data defined in `bin_wirte.m`. These are the model properties:
@@ -52,6 +48,9 @@ These are the plotting properties:
 - `xtraj` the vector containing the start and end point for the line hwere the trajectores are evenly spaced, for <img src="https://latex.codecogs.com/gif.latex?\sigma_{1}"/>
 - `ytraj` the vector containing the start and end point for the line hwere the trajectores are evenly spaced, for <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>
 - `Nw` the number of grid points in the x- and y-direction for the displacements
+
+## References
+Guennebaud, G., Jacob, B., et al. (2010). Eigen v3. http://eigen.tuxfamily.org.
 
 __________________________________________________________________________________________
 Created by,
