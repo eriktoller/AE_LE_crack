@@ -7,7 +7,7 @@ The program includes the Cartesian stress field (<img src="https://latex.codecog
 
 A log file, `log.txt`, is created with all the variable data and time stamp.
 
-This program has been developed using *Microsoft Visual Stuido* and only the `.cpp` file is included in the repository. The solution also uses the Eigen library (Guennebaud & Jacob, 2010)
+This program has been developed using *Microsoft Visual Stuido* and only the `.cpp` file is included in the repository. The solution also uses the Eigen library (Guennebaud & Jacob, 2010).
 
 ## Instructions
 To generate plot for stresses filed (here only for gravity at the moment) follow the following procedure:
@@ -51,8 +51,3 @@ These are the plotting properties:
 
 ## References
 Guennebaud, G., Jacob, B., et al. (2010). Eigen v3. http://eigen.tuxfamily.org.
-
-__________________________________________________________________________________________
-Created by,
-
-Erik Toller
