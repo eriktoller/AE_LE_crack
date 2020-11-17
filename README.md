@@ -49,5 +49,9 @@ These are the plotting properties:
 - `ytraj` the vector containing the start and end point for the line hwere the trajectores are evenly spaced, for <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>
 - `Nw` the number of grid points in the x- and y-direction for the displacements
 
+## Citations
+The program has been used in the following paper:
+- Comming soon.
+
 ## References
 Guennebaud, G., Jacob, B., et al. (2010). Eigen v3. http://eigen.tuxfamily.org.
