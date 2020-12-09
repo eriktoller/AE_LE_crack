@@ -283,19 +283,18 @@ inline dcvec AE_crack_solver(Eigen::VectorXd T_s, Eigen::VectorXd T_n, dvec term
 
 
 	// Solving the linear system
-	/*	if (m == N)
-		{
-			b1 = A.lu().solve(T_s);
-			b2 = A.lu().solve(T_n);
-		}
-		else
-		{*/
-			b1 = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_s);
-			b2 = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_n);
-		//}
+	if (m == N)
+	{
+		b1 = A.lu().solve(T_s);
+		b2 = A.lu().solve(T_n);
+	}
+	else
+	{
+		b1 = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_s);
+		b2 = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_n);
+	}
 
 	// Assigning to beta
-	//#pragma omp parallel for default(none) shared(beta, b1, b2)
 	for (int ii = 0; ii < m; ii++)
 	{
 		beta[ii] = dcomp(b2[ii], b1[ii]);
@@ -337,7 +336,7 @@ inline ddcvec iterator(double cond, int ITR, int N, dvec p, double sigma_11inf, 
 		theta[ii] = theta_0 + (ii + 1) * deltheta;
 	}
 
-	//#pragma omp parallel for default(none) shared(A, z, term)
+	#pragma omp parallel for default(none) shared(A, z, term, z1, z2, L, mu, theta)
 	for (int ii = 0; ii < N; ii++)
 	{
 		for (int mm = 0; mm < m; mm++)
@@ -359,7 +358,6 @@ inline ddcvec iterator(double cond, int ITR, int N, dvec p, double sigma_11inf, 
 	int NIT = 0;
 	while (error > cond && NIT < ITR)
 	{
-		//omp_set_num_threads(2);
 		#pragma omp parallel for default(none) shared(sigma_11inf, z, z1, z2, L, mu, m, nc, beta, term, p)
 		for (int ii = 0; ii < nc; ii++)
 		{
@@ -395,10 +393,6 @@ inline ddcvec iterator(double cond, int ITR, int N, dvec p, double sigma_11inf, 
   		std::cout << std::scientific;
 		std::cout << "	" << error << "	" << NIT << std::endl;
 	}
-
-	// Reset number of threads
-	//int threads_max = omp_get_max_threads();
-	//omp_set_num_threads(threads_max);
 
 	return { beta };
 }
@@ -948,10 +942,6 @@ int main()
 			Defining variables and importing data
 	-----------------------------------------------------------------------*/
 
-	// Set the threads fro parallell
-	//omp_set_num_threads(4);
-	//Eigen::setNbThreads(1);
-
 	// Header in console window
 	auto start = std::chrono::high_resolution_clock::now(); // Start the clock
 
@@ -1194,12 +1184,12 @@ int main()
 			Checking the error
 	-----------------------------------------------------------------------*/
 	int num;
-	if (m < 100)
+	if (m < 1000)
 	{
-		num = (int) round(201*100/nc);
+		num = (int) round(N * 2);
 	}
 	else {
-		num = (int) round(N * 2 *100/nc);
+		num = (int) round(N * 1.5);
 	}
 	dvec T_check_re(num*nc), T_check_im(num*nc);
 	double theta_0 = 0.1;
@@ -1765,7 +1755,6 @@ int main()
 	logfile << "Unifrom stress state:\n";
 	logfile << "sigma_11inf = " << sigma_11inf << std::endl;
 	logfile << std::endl;
-	logfile << std::endl;
 	if (nc > 0)
 	{
 		logfile << "Cracks:\n";
@@ -1823,25 +1812,19 @@ int main()
 			}
 		}
 		logfile << "]" << std::endl;
-
-		for (int ii = 0; ii < nc; ii++)
-		{
-			logfile << "    beta[" << ii << "] = [";
-			for (int jj = 0; jj < m; jj++)
-			{
-				if (jj == (m - 1))
-				{
-					logfile << beta[ii][jj];
-				}
-				else
-				{
-					logfile << beta[ii][jj] << ", ";
-				}
-			}
-			logfile << "]" << std::endl;
-		}
 		logfile << std::endl << std::endl;
 	}
+	logfile << "=================================================================" << std::endl << std::endl;
+	logfile << "		ERRORS	" << std::endl << std::endl;
+	logfile << "=================================================================" << std::endl << std::endl;
+	logfile << "     Difference for ts" << std::endl;
+	logfile << "     Maximum = " << error_max_re << std::endl;
+	logfile << "     Mean    = " << error_mean_re << std::endl;
+	logfile << "     Median  = " << error_med_re << std::endl;
+	logfile << "     Difference for tn" << std::endl;
+	logfile << "     Maximum = " << error_max_im << std::endl;
+	logfile << "     Mean    = " << error_mean_im << std::endl;
+	logfile << "     Median  = " << error_med_im << std::endl;
 
 	logfile.close();
 	std::cout << "Program finnished after ";
