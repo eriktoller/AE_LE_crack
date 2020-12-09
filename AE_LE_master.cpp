@@ -7,9 +7,10 @@
 #include <fstream>
 #include <ctime>
 #include <chrono>
-#include <omp.h>
 #include <stdio.h>
 #include <Eigen/Dense>
+#include <Eigen/Core>
+#include <omp.h>
 
 // Defining special types
 typedef std::complex<double> dcomp;
@@ -178,7 +179,6 @@ inline std::tuple<dcomp, dcomp> tau_crack(dcomp z, dcomp z1, dcomp z2, double L,
 	dcomp chi, chi_bar, Z, chi_pow;
 	dcomp dphi, dphi_bar, ddphi, dpsi;
 	dcomp tau_11, tau_12, S1, L_frac;
-	double n;
 
 	// Getting the chi - and Z - coordinates
 	chi = chi_from_z(z, z1, z2, L, mu);
@@ -190,13 +190,12 @@ inline std::tuple<dcomp, dcomp> tau_crack(dcomp z, dcomp z1, dcomp z2, double L,
 	dphi_bar = 0;
 	ddphi = 0;
 	dpsi = 0;
-	n = 0;
 	chi_pow = chi * chi - 1.0;
+	//#pragma omp parallel for default(none) shared(chi, chi_pow, chi_bar, beta) reduction(+: dphi,dphi_bar, ddphi, dpsi)
 	for (int ii = 0; ii < m; ii++)
 	{
-		dcomp beta_n;
-		n += 1;
-		beta_n = beta[ii] * n;
+		double n = ii + 1;
+		dcomp beta_n = beta[ii] * n;
 		dphi += conj(beta_n) * pow(chi, (1.0 - n)) / chi_pow;
 		dphi_bar += beta_n * pow(chi_bar, (1.0 - n)) / (chi_bar * chi_bar - 1.0);
 		ddphi -= conj(beta_n) * (pow(chi, (2.0 - n)) / (chi_pow*chi_pow*chi_pow))*((n + 1.0)*chi*chi - n + 1.0);
@@ -224,20 +223,33 @@ inline std::tuple<dcomp, dcomp>  tau_total(dcomp z, double sigma_11inf, dcvec z1
 {
 	// Defining the variables
 	dcomp tau_11, tau_12;
+	dcvec tau_11_local(nc);
+	dcvec tau_12_local(nc);
 
 	std::tie(tau_11, tau_12) = tau_uni(sigma_11inf);
 	if (m > 0)
 	{
+		//#pragma omp parallel for default(none) shared(z1, z2, L, mu, m, beta, tau_11_local,tau_12_local)
 		for (int ii = 0; ii < nc; ii++)
 		{
 			if (ii != m_not)
 			{
 				dcomp tau_11c, tau_12c;
 				std::tie(tau_11c, tau_12c) = tau_crack(z, z1[ii], z2[ii], L[ii], mu[ii], m, beta[ii]);
-				tau_11 += tau_11c;
-				tau_12 += tau_12c;
+				tau_11_local[ii] = tau_11c;
+				tau_12_local[ii] = tau_12c;
 			}
 		}
+		dcomp tau_11s = 0;
+		dcomp tau_12s = 0;
+		//#pragma omp parallel for reduction (+:tau_11s, tau_12s)
+		for (int i = 0;i < nc;i++)
+		{
+			tau_11s = tau_11s + tau_11_local[i];
+			tau_12s = tau_12s + tau_12_local[i];
+		}
+		tau_11 += tau_11s;
+		tau_12 += tau_12s;
 	}
 
 	return { tau_11, tau_12 };
@@ -260,19 +272,30 @@ inline dcomp T_total(dcomp z, double sigma_11inf, dcvec z1, dcvec z2, dvec L, dv
 }
 
 /* --------------------------------------------------------------------
-		SOLVE CRACK BETA
+		SOLVE CRACK BETA Eigen::MatrixXd
 -----------------------------------------------------------------------*/
-inline dcvec AE_crack_solver(Eigen::VectorXd T_s, Eigen::VectorXd T_n, dvec term, Eigen::MatrixXd A, int N, int m)
+inline dcvec AE_crack_solver(Eigen::VectorXd T_s, Eigen::VectorXd T_n, dvec term, Eigen::MatrixXd A, int m, int N)
 {
 	// Defining the variables
 	dcvec beta(m);
+	Eigen::VectorXd b1(m);
+	Eigen::VectorXd b2(m);
+
 
 	// Solving the linear system
-	Eigen::VectorXd b1 = A.colPivHouseholderQr().solve(T_s);
-	Eigen::VectorXd b2 = A.colPivHouseholderQr().solve(T_n);
+	/*	if (m == N)
+		{
+			b1 = A.lu().solve(T_s);
+			b2 = A.lu().solve(T_n);
+		}
+		else
+		{*/
+			b1 = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_s);
+			b2 = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_n);
+		//}
 
 	// Assigning to beta
-	#pragma omp parallel for default(none) shared(beta)
+	//#pragma omp parallel for default(none) shared(beta, b1, b2)
 	for (int ii = 0; ii < m; ii++)
 	{
 		beta[ii] = dcomp(b2[ii], b1[ii]);
@@ -308,13 +331,13 @@ inline ddcvec iterator(double cond, int ITR, int N, dvec p, double sigma_11inf, 
 	deltheta = 2 * pi() / N;
 
 	// Calculating the A, a theta and term matrices
-#pragma omp parallel for default(none) shared(theta)
+	#pragma omp parallel for default(none) shared(theta)
 	for (int ii = 0; ii < N; ii++)
 	{
 		theta[ii] = theta_0 + (ii + 1) * deltheta;
 	}
 
-#pragma omp parallel for default(none) shared(A, z, term)
+	//#pragma omp parallel for default(none) shared(A, z, term)
 	for (int ii = 0; ii < N; ii++)
 	{
 		for (int mm = 0; mm < m; mm++)
@@ -336,11 +359,12 @@ inline ddcvec iterator(double cond, int ITR, int N, dvec p, double sigma_11inf, 
 	int NIT = 0;
 	while (error > cond && NIT < ITR)
 	{
+		//omp_set_num_threads(2);
+		#pragma omp parallel for default(none) shared(sigma_11inf, z, z1, z2, L, mu, m, nc, beta, term, p)
 		for (int ii = 0; ii < nc; ii++)
 		{
 			Eigen::VectorXd T_s(N);
 			Eigen::VectorXd T_n(N);
-#pragma omp parallel for default(none) shared(T_s, T_n)
 			for (int jj = 0; jj < N; jj++)
 			{
 				dcomp T;
@@ -348,13 +372,12 @@ inline ddcvec iterator(double cond, int ITR, int N, dvec p, double sigma_11inf, 
 				T_s(jj) = -real(T)*term[ii][jj];
 				T_n(jj) = (p[ii] + imag(T))*term[ii][jj];
 			}
-			beta[ii] = AE_crack_solver(T_s, T_n, term[ii], A, N, m);
-
+			beta[ii] = AE_crack_solver(T_s, T_n, term[ii], A, m, N);
 		}
 
 		// Calcualte the error
 		dvec delbeta(nc);
-#pragma omp parallel for default(none) shared(delbeta)
+		#pragma omp parallel for default(none) shared(delbeta, beta, error_b)
 		for (int ii = 0; ii < nc; ii++)
 		{
 			dvec delb_temp(m);
@@ -369,11 +392,13 @@ inline ddcvec iterator(double cond, int ITR, int N, dvec p, double sigma_11inf, 
 		NIT += 1;
 		error_b = beta;
 
-		std::cout << std::scientific;
+  		std::cout << std::scientific;
 		std::cout << "	" << error << "	" << NIT << std::endl;
 	}
 
-
+	// Reset number of threads
+	//int threads_max = omp_get_max_threads();
+	//omp_set_num_threads(threads_max);
 
 	return { beta };
 }
@@ -417,7 +442,7 @@ std::tuple<dvec, dvec, ddvec, ddvec, ddvec> stress_field(double xfrom, double xt
 	// Retriving the terms from the sigma function for z
 	dx = (xto - xfrom) / (Nx - 1);
 	dy = (yto - yfrom) / (Ny - 1);
-#pragma omp parallel for default(none) shared(grid_11, grid_22, grid_12, x_vec, y_vec)
+	#pragma omp parallel for default(none) shared(grid_11, grid_22, grid_12, x_vec, y_vec, sigma_11inf, z1, z2, L, mu, m, nc, beta, m_not)
 	for (int ii = 0; ii < Nx; ii++)
 	{
 		for (int jj = Ny; jj--;)
@@ -496,7 +521,7 @@ std::tuple<ddvec, ddvec, ddvec> principal_stress_field(double xfrom, double xto,
 	// Retriving the terms from the sigma function for z
 	dx = (xto - xfrom) / (Nx - 1);
 	dy = (yto - yfrom) / (Ny - 1);
-	#pragma omp parallel for default(none) shared(grid_1, grid_2, grid_tp, x_vec, y_vec)
+	#pragma omp parallel for default(none) shared(grid_1, grid_2, grid_tp, x_vec, y_vec, sigma_11inf, z1, z2, L, mu, m, nc, beta, m_not)
 	for (int ii = 0; ii < Nx; ii++)
 	{
 		for (int jj = Ny; jj--;)
@@ -533,7 +558,7 @@ std::tuple<ddcvec, ddcvec> principal_stress_trajectories(double xfrom, double xt
 	NIT = 10;
 
 	// SIGMA 1
-	#pragma omp parallel for default(none) shared(traj_1)
+	#pragma omp parallel for default(none) shared(traj_1, sigma_11inf, z1, z2, L, mu, m, nc, beta, m_not)
 	for (int ii = 0; ii < lvs_traj; ii++)
 	{
 		traj_1[ii][0] = dcomp(real(xtraj[0]) + ii * dx_lvsre, imag(xtraj[0]) + ii * dx_lvsim);
@@ -623,7 +648,7 @@ std::tuple<ddcvec, ddcvec> principal_stress_trajectories(double xfrom, double xt
 	}
 
 	// SIGMA 2
-	#pragma omp parallel for default(none) shared(traj_2)
+	#pragma omp parallel for default(none) shared(traj_2, sigma_11inf, z1, z2, L, mu, m, nc, beta, m_not)
 	for (int ii = 0; ii < lvs_traj; ii++)
 	{
 		traj_2[ii][0] = dcomp(real(ytraj[0]) + ii * dy_lvsre, imag(ytraj[0]) + ii * dy_lvsim);
@@ -812,7 +837,7 @@ std::tuple<dvec, dvec, ddcvec> w_field(double xfrom, double xto, double yfrom, d
 	// Retriving the terms from the sigma function for z
 	dx = (xto - xfrom) / (Nw - 1.0);
 	dy = (yto - yfrom) / (Nw - 1.0);
-	#pragma omp parallel for default(none) shared(grid_w, x_vecw, y_vecw)
+	#pragma omp parallel for default(none) shared(grid_w, x_vecw, y_vecw, kappa, G, sigma_11inf, z1, z2, L, mu, m, nc, beta)
 	for (int ii = 0; ii < Nw; ii++)
 	{
 		for (int jj = 0; jj < Nw; jj++)
@@ -845,7 +870,7 @@ ddcvec w_trajectories(double xfrom, double xto, double yfrom, double yto, int Nt
 	NIT = 10;
 
 	// w trajectories
-	#pragma omp parallel for default(none) shared(traj_w)
+	#pragma omp parallel for default(none) shared(traj_w, kappa, G, sigma_11inf, z1, z2, L, mu, m, nc, beta)
 	for (int ii = 0; ii < Nw; ii++)
 	{
 		traj_w[ii][0] = dcomp(xfrom, yfrom + ii * dy_lvs);
@@ -923,6 +948,10 @@ int main()
 			Defining variables and importing data
 	-----------------------------------------------------------------------*/
 
+	// Set the threads fro parallell
+	//omp_set_num_threads(4);
+	//Eigen::setNbThreads(1);
+
 	// Header in console window
 	auto start = std::chrono::high_resolution_clock::now(); // Start the clock
 
@@ -949,9 +978,15 @@ int main()
 
 	// Read the input data from binary file PART 1
 	std::cout << "Loading input data" << std::endl;
-	double fin[6000];
-	std::ifstream input_file("geometry_data.bin", std::ios::in | std::ios::binary);
-	input_file.read((char *)&fin, sizeof fin);
+	std::ifstream input_file("geometry_data.bin", std::ios::in | std::ios::binary | std::ios::ate);
+	std::streampos size = input_file.tellg();
+	std::cout << "size=" << size << "\n";
+	char * memblock = new char[size];
+	input_file.seekg(0, std::ios::beg);
+	input_file.read(memblock, size);
+	double* fin = (double*)memblock;//reinterpret as doubles
+
+
 	sigma_11inf = fin[0];
 	kappa = fin[1];
 	G = fin[2];
@@ -964,7 +999,7 @@ int main()
 	dvec p(nc), L(nc), mu(nc);
 	ddcvec beta(nc, dcvec(m));
 
-	int pos = 5 + 1;
+	int pos = 5+1;
 	if (nc > 0)
 	{
 		for (int ii = 0; ii < nc; ii++)
@@ -973,14 +1008,14 @@ int main()
 			int im = pos + nc + ii;
 			z1[ii] = dcomp(fin[re], fin[im]);
 		}
-		pos += 2 * nc;
+		pos += 2*nc;
 		for (int ii = 0; ii < nc; ii++)
 		{
 			int re = pos + ii;
 			int im = pos + nc + ii;
 			z2[ii] = dcomp(fin[re], fin[im]);
 		}
-		pos += 2 * nc;
+		pos += 2*nc;
 		for (int ii = 0; ii < nc; ii++)
 		{
 			p[ii] = fin[pos + ii];
@@ -1015,9 +1050,14 @@ int main()
 	dcvec xtraj, ytraj;
 
 	// Read the plot data from binary file
-	double fplot[800];
-	std::ifstream plot_file("plot_data.bin", std::ios::in | std::ios::binary);
-	plot_file.read((char *)&fplot, sizeof fplot);
+	std::ifstream plot_file("plot_data.bin", std::ios::in | std::ios::binary | std::ios::ate);
+	std::streampos size2 = plot_file.tellg();
+	std::cout << "size=" << size2 << "\n";
+	char * memblock2 = new char[size2];
+	plot_file.seekg(0, std::ios::beg);
+	plot_file.read(memblock2, size2);
+	double* fplot = (double*)memblock2;//reinterpret as doubles
+
 	xfrom = fplot[0];
 	xto = fplot[1];
 	yfrom = fplot[2];
@@ -1043,7 +1083,7 @@ int main()
 	std::cout << "         nc = " << nc << std::endl;
 	std::cout << "          m = " << m << std::endl;
 	std::cout << "          N = " << N << std::endl;
-	if (nc > 0)
+	if (nc > 0 && nc < 50)
 	{
 		std::cout << "         z1 = [";
 		for (int ii = 0; ii < nc; ii++)
@@ -1156,14 +1196,15 @@ int main()
 	int num;
 	if (m < 100)
 	{
-		num = 201;
+		num = (int) round(201*100/nc);
 	}
 	else {
-		num = N * 2 + 1;
+		num = (int) round(N * 2 *100/nc);
 	}
 	dvec T_check_re(num*nc), T_check_im(num*nc);
 	double theta_0 = 0.1;
 	double deltheta = 2 * pi() / num;
+	#pragma omp parallel for default(none) shared(T_check_re, T_check_im, sigma_11inf, z1, z2, L, mu, m, nc, beta, p)
 	for (int ii = 0; ii < nc; ii++)
 	{
 		for (int jj = 0; jj < num; jj++)
@@ -1201,6 +1242,149 @@ int main()
 	std::cout << "     Maximum = " << error_max_im << std::endl;
 	std::cout << "     Mean    = " << error_mean_im << std::endl;
 	std::cout << "     Median  = " << error_med_im << std::endl;
+
+	std::cout << "=================================================================" << std::endl << std::endl;
+	std::cout << "		SAVING THE OUTPUT DATA	" << std::endl << std::endl;
+	std::cout << "=================================================================" << std::endl << std::endl;
+
+	// Create/open the two output files
+	std::ofstream outfile_coef("input_data.bin", std::ios::out | std::ios::binary);
+
+	dcomp H;
+	dcvec z0(1);
+	ddcvec a(1, dcvec(1)), b(1, dcvec(1));
+	dvec R(1);
+	double rho, g, nu;
+	int nt, mt;
+	nt = 0;
+	mt = 0;
+	z0[0] = dcomp(0, 0);
+	R[0] = 1;
+
+	// Save the plot properties
+	dvec prop = { real(H), imag(H), rho, g, sigma_11inf, nu, kappa, G, 1.0*nc, 1.0*m, 1.0*nt, 1.0*mt };
+	const char* pointerprop = reinterpret_cast<const char*>(&prop[0]);
+	std::size_t bytesprop = prop.size() * sizeof(prop[0]);
+	outfile_coef.write(pointerprop, bytesprop);
+
+
+	// saving the coordinates of the cracks
+	dvec fz1_re(nc);
+	dvec fz1_im(nc);
+	for (int jj = 0; jj < nc; jj++)
+	{
+		fz1_re[jj] = real(z1[jj]);
+		fz1_im[jj] = imag(z1[jj]);
+	}
+	const char* pointerz1_re = reinterpret_cast<const char*>(&fz1_re[0]);
+	std::size_t bytesz1_re = fz1_re.size() * sizeof(fz1_re[0]);
+	outfile_coef.write(pointerz1_re, bytesz1_re);
+	const char* pointerz1_im = reinterpret_cast<const char*>(&fz1_im[0]);
+	std::size_t bytesz1_im = fz1_im.size() * sizeof(fz1_im[0]);
+	outfile_coef.write(pointerz1_im, bytesz1_im);
+
+	dvec fz2_re(nc);
+	dvec fz2_im(nc);
+	for (int jj = 0; jj < nc; jj++)
+	{
+		fz2_re[jj] = real(z2[jj]);
+		fz2_im[jj] = imag(z2[jj]);
+	}
+	const char* pointerz2_re = reinterpret_cast<const char*>(&fz2_re[0]);
+	std::size_t bytesz2_re = fz2_re.size() * sizeof(fz2_re[0]);
+	outfile_coef.write(pointerz2_re, bytesz2_re);
+	const char* pointerz2_im = reinterpret_cast<const char*>(&fz2_im[0]);
+	std::size_t bytesz2_im = fz2_im.size() * sizeof(fz2_im[0]);
+	outfile_coef.write(pointerz2_im, bytesz2_im);
+
+	dvec fL = L;
+	const char* pointerL = reinterpret_cast<const char*>(&fL[0]);
+	std::size_t bytesL = fL.size() * sizeof(fL[0]);
+	outfile_coef.write(pointerL, bytesL);
+
+	dvec fmu = mu;
+	const char* pointermu = reinterpret_cast<const char*>(&fmu[0]);
+	std::size_t bytesmu = fmu.size() * sizeof(fmu[0]);
+	outfile_coef.write(pointermu, bytesmu);
+
+	// Save the beta
+	for (int ii = 0; ii < nc; ii++)
+	{
+		dvec fbeta_re(m);
+		dvec fbeta_im(m);
+
+		for (int jj = 0; jj < m; jj++)
+		{
+			fbeta_re[jj] = real(beta[ii][jj]);
+			fbeta_im[jj] = imag(beta[ii][jj]);
+		}
+		const char* pointerbeta_re = reinterpret_cast<const char*>(&fbeta_re[0]);
+		std::size_t bytesbeta_re = fbeta_re.size() * sizeof(fbeta_re[0]);
+		outfile_coef.write(pointerbeta_re, bytesbeta_re);
+		const char* pointerbeta_im = reinterpret_cast<const char*>(&fbeta_im[0]);
+		std::size_t bytesbeta_im = fbeta_im.size() * sizeof(fbeta_im[0]);
+		outfile_coef.write(pointerbeta_im, bytesbeta_im);
+	}
+
+	// saving the coordinates of the circular tunnels
+	dvec fz0_re(nt);
+	dvec fz0_im(nt);
+	dvec fR(nt);
+	for (int jj = 0; jj < nt; jj++)
+	{
+		fz0_re[jj] = real(z0[jj]);
+		fz0_im[jj] = imag(z0[jj]);
+		fR[jj] = R[jj];
+	}
+	const char* pointerz0_re = reinterpret_cast<const char*>(&fz0_re[0]);
+	std::size_t bytesz0_re = fz0_re.size() * sizeof(fz0_re[0]);
+	outfile_coef.write(pointerz0_re, bytesz0_re);
+	const char* pointerz0_im = reinterpret_cast<const char*>(&fz0_im[0]);
+	std::size_t bytesz0_im = fz0_im.size() * sizeof(fz0_im[0]);
+	outfile_coef.write(pointerz0_im, bytesz0_im);
+
+	const char* pointerR = reinterpret_cast<const char*>(&fR[0]);
+	std::size_t bytesR = fR.size() * sizeof(fR[0]);
+	outfile_coef.write(pointerR, bytesR);
+
+	// Save the a and b
+	for (int ii = 0; ii < nt; ii++)
+	{
+		dvec fa_re(mt);
+		dvec fa_im(mt);
+
+		for (int jj = 0; jj < mt; jj++)
+		{
+			fa_re[jj] = real(a[ii][jj]);
+			fa_im[jj] = imag(a[ii][jj]);
+		}
+		const char* pointera_re = reinterpret_cast<const char*>(&fa_re[0]);
+		std::size_t bytesa_re = fa_re.size() * sizeof(fa_re[0]);
+		outfile_coef.write(pointera_re, bytesa_re);
+		const char* pointera_im = reinterpret_cast<const char*>(&fa_im[0]);
+		std::size_t bytesa_im = fa_im.size() * sizeof(fa_im[0]);
+		outfile_coef.write(pointera_im, bytesa_im);
+	}
+
+	for (int ii = 0; ii < nt; ii++)
+	{
+		dvec fb_re(mt);
+		dvec fb_im(mt);
+
+		for (int jj = 0; jj < mt; jj++)
+		{
+			fb_re[jj] = real(b[ii][jj]);
+			fb_im[jj] = imag(b[ii][jj]);
+		}
+		const char* pointerb_re = reinterpret_cast<const char*>(&fb_re[0]);
+		std::size_t bytesb_re = fb_re.size() * sizeof(fb_re[0]);
+		outfile_coef.write(pointerb_re, bytesb_re);
+		const char* pointerb_im = reinterpret_cast<const char*>(&fb_im[0]);
+		std::size_t bytesb_im = fb_im.size() * sizeof(fb_im[0]);
+		outfile_coef.write(pointerb_im, bytesb_im);
+	}
+
+	std::cout << " -> Complete" << std::endl << std::endl;
 
 	std::cout << "=================================================================" << std::endl;
 	std::cout << "=================================================================" << std::endl << std::endl;
@@ -1482,33 +1666,33 @@ int main()
 	outfiledim.write(pointerdim, bytesdim);
 
 	// saving the coordinates of the cracks
-	dvec fz1_re(nc);
-	dvec fz1_im(nc);
+	dvec fz1_res(nc);
+	dvec fz1_ims(nc);
 	for (int jj = 0; jj < nc; jj++)
 	{
-		fz1_re[jj] = real(z1[jj]);
-		fz1_im[jj] = imag(z1[jj]);
+		fz1_res[jj] = real(z1[jj]);
+		fz1_ims[jj] = imag(z1[jj]);
 	}
-	const char* pointerz1_re = reinterpret_cast<const char*>(&fz1_re[0]);
-	std::size_t bytesz1_re = fz1_re.size() * sizeof(fz1_re[0]);
-	outfiledim.write(pointerz1_re, bytesz1_re);
-	const char* pointerz1_im = reinterpret_cast<const char*>(&fz1_im[0]);
-	std::size_t bytesz1_im = fz1_im.size() * sizeof(fz1_im[0]);
-	outfiledim.write(pointerz1_im, bytesz1_im);
+	const char* pointerz1_res = reinterpret_cast<const char*>(&fz1_res[0]);
+	std::size_t bytesz1_res = fz1_res.size() * sizeof(fz1_res[0]);
+	outfiledim.write(pointerz1_res, bytesz1_res);
+	const char* pointerz1_ims = reinterpret_cast<const char*>(&fz1_ims[0]);
+	std::size_t bytesz1_ims = fz1_ims.size() * sizeof(fz1_ims[0]);
+	outfiledim.write(pointerz1_ims, bytesz1_ims);
 
-	dvec fz2_re(nc);
-	dvec fz2_im(nc);
+	dvec fz2_res(nc);
+	dvec fz2_ims(nc);
 	for (int jj = 0; jj < nc; jj++)
 	{
-		fz2_re[jj] = real(z2[jj]);
-		fz2_im[jj] = imag(z2[jj]);
+		fz2_res[jj] = real(z2[jj]);
+		fz2_ims[jj] = imag(z2[jj]);
 	}
-	const char* pointerz2_re = reinterpret_cast<const char*>(&fz2_re[0]);
-	std::size_t bytesz2_re = fz2_re.size() * sizeof(fz2_re[0]);
+	const char* pointerz2_res = reinterpret_cast<const char*>(&fz2_res[0]);
+	std::size_t bytesz2_res = fz2_res.size() * sizeof(fz2_res[0]);
 	outfiledim.write(pointerz2_re, bytesz2_re);
-	const char* pointerz2_im = reinterpret_cast<const char*>(&fz2_im[0]);
-	std::size_t bytesz2_im = fz2_im.size() * sizeof(fz2_im[0]);
-	outfiledim.write(pointerz2_im, bytesz2_im);
+	const char* pointerz2_ims = reinterpret_cast<const char*>(&fz2_ims[0]);
+	std::size_t bytesz2_ims = fz2_ims.size() * sizeof(fz2_ims[0]);
+	outfiledim.write(pointerz2_ims, bytesz2_ims);
 
 	// Close the output files
 	outfile.close();
