@@ -1,7 +1,7 @@
 # AE_LE_crack
 An analytic element for intersecting cracks in a linear elastic half-space. A program which calculated the stress field for given number of cracks, which may intersect, in a uniform stress field. The input files for the plot properties and the physical constants are provided through the MATLAB program `run_ae_master.m` and then calls the program `AE_LE_master.cpp` to solve and plot the system.
 
-The program includes the Cartesian stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{11}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{22}"/>  & <img src="https://latex.codecogs.com/gif.latex?\sigma_{12}"/> ), the principal stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{1}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>  & <img src="https://latex.codecogs.com/gif.latex?\theta_{p}"/> ) and the principal stress trajectories. Also, it computes the displacement filed <img src="https://latex.codecogs.com/gif.latex?w"/> and the displacement trajectories. For a given resolution and coordinates.
+The program includes the Cartesian stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{11}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{22}"/>  & <img src="https://latex.codecogs.com/gif.latex?\sigma_{12}"/> ), the principal stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{1}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>  & <img src="https://latex.codecogs.com/gif.latex?\theta_{p}"/> ) and the principal stress trajectories. Also, it computes the displacement filed <img src="https://latex.codecogs.com/gif.latex?w"/> and the displacement trajectories. For a given resolution and coordinates. The results are saved as a `.mat`-file with the days date.
 
 This program has been developed using *Microsoft Visual Stuido* and only the `.cpp` file and `.exe` is included in the repository. The solution also uses the Eigen library (Guennebaud & Jacob, 2010).
 
@@ -30,6 +30,11 @@ These are the plotting properties:
 - `xtraj` the vector containing the start and end point for the line hwere the trajectores are evenly spaced, for <img src="https://latex.codecogs.com/gif.latex?\sigma_{1}"/>
 - `ytraj` the vector containing the start and end point for the line hwere the trajectores are evenly spaced, for <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>
 - `Nw` the number of grid points in the x- and y-direction for the displacements
+
+## Plotting functions
+The following functions are included for the plotting scheme in MATLAB
+- `creat_figure.m` creat the figure window
+- `Plot_line.m` plots a line from `z1` to `z2`
 
 ## Citations
 The program has been used in the following paper:
