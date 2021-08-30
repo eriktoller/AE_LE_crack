@@ -343,29 +343,32 @@ inline dcvec AE_crack_solver(Eigen::VectorXd T_s, Eigen::VectorXd T_n, Eigen::Ma
 	else
 	{
 		// Define new matrices for A and T and assign the pre-calculated values
-		Eigen::MatrixXd A_int(Na + int_count * 2, ma);
-		Eigen::VectorXd T_s_int(Na + int_count * 2);
-		Eigen::VectorXd T_n_int(Na + int_count * 2);
-		#pragma omp parallel for default(none) shared(A_int, A, T_n_int, T_n, T_s_int, T_s)
+		Eigen::MatrixXd A_int_s(Na + int_count * 3, ma);
+		Eigen::MatrixXd A_int_n(Na + int_count, ma);
+		Eigen::VectorXd T_s_int(Na + int_count * 3);
+		Eigen::VectorXd T_n_int(Na + int_count);
+		#pragma omp parallel for default(none) shared(A_int_s, A_int_n, A, T_n_int, T_n, T_s_int, T_s)
 		for (int ii = 0; ii < Na; ii++)
 		{
 			for (int jj = 0; jj < ma; jj++)
 			{
 				/*A_int_re(ii, jj) = A(ii, jj);
 				A_int_im(ii, jj) = A(ii, jj);*/
-				A_int(ii, jj) = A(ii, jj);
+				A_int_s(ii, jj) = A(ii, jj);
+				A_int_n(ii, jj) = A(ii, jj);
 			}
 			T_s_int(ii) = T_s(ii);
 			T_n_int(ii) = T_n(ii);
 		}
-		int cnt = 0;
+		int cnt_s = 0;
+		int cnt_n = 0;
 		for (int ii = 0; ii < na; ii++)
 		{
 			// Check if element ii has any intersections
 			if (int_check[ii] == 1)
 			{
 				// Define variables
-				dcomp chia, tau11, chi_pow, L_frac;
+				dcomp chia, tau11, chi_pow, L_frac, T_temp;
 				double thetaa;
 
 				// Compute the intersection angel in the chi-plane
@@ -380,9 +383,13 @@ inline dcvec AE_crack_solver(Eigen::VectorXd T_s, Eigen::VectorXd T_n, Eigen::Ma
 				for (int jj = 0; jj < ma; jj++)
 				{
 					double n = jj + 1.0;
-					// Add a control point at the intersection
-					A_int(Na + cnt, jj) = real( chi_pow * L_frac * n * pow(chia, -n) );
-					A_int(Na + (cnt + 1), jj) = imag( chi_pow * L_frac * n * pow(chia, -n) );
+					// Add a control point at the intersection - tau^11 condition
+					A_int_s(Na + cnt_s, jj) = real( chi_pow * L_frac * n * pow(chia, -n) );
+					A_int_s(Na + (cnt_s + 1), jj) = imag( chi_pow * L_frac * n * pow(chia, -n) );
+					
+					// Add a control point at the intersection - traction condition
+					A_int_s(Na + (cnt_s + 2), jj) = n * sin(n * thetaa);
+					A_int_n(Na + cnt_n, jj) = n * sin(n * thetaa);
 				}
 
 				// Calculate the taus at the intersection
@@ -390,16 +397,26 @@ inline dcvec AE_crack_solver(Eigen::VectorXd T_s, Eigen::VectorXd T_n, Eigen::Ma
 				std::tie(tau_11, tau_12) = tau_total(zint[ii], sigma_11inf, z1a, z2a, La, mua, ma, na, a_in, m_is_a);
 
 				// Add the intersection to the T_s vector
-				T_s_int(Na + cnt) = -real(tau_11);
-				T_s_int(Na + (cnt + 1)) = -imag(tau_11);
-				cnt += 2;
+				T_s_int(Na + cnt_s) = -real(tau_11);
+				T_s_int(Na + (cnt_s + 1)) = -imag(tau_11);
+
+				// Calculate the traction at the control point at the intersection
+				T_temp = T_total(zint[ii], sigma_11inf, z1a, z2a, La, mua, ma, na, a_in, m_is_a, m_is_a);
+
+				// Add the intersection to the T vectors
+				T_s_int(Na + (cnt_s + 2)) = real(T_temp) * 0.5 * La[m_is_a] * sin(thetaa);
+				T_n_int(Na + cnt_n) = (pa[ii] + imag(T_temp)) * -0.5 * La[m_is_a] * sin(thetaa);
+
+				// Add step to loop count
+				cnt_s += 3;
+				cnt_n += 1;
 			}
 			
 		}
 
 		// Solving the linear system (with intersections)
-		b1 = A_int.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_s_int);
-		b2 = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_n);
+		b1 = A_int_s.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_s_int);
+		b2 = A_int_n.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T_n_int);
 	}
 	// Assign to a
 	for (int ii = 0; ii < ma; ii++)
@@ -1348,6 +1365,8 @@ int main()
 						{
 							dcomp tau_11, tau_12, T;
 							std::tie(tau_11, tau_12) = tau_total(zint[ii][jj], sigma_11inf, z1a, z2a, La, mua, ma, na, a, -1);
+							T = T_total(z, sigma_11inf, z1a, z2a, La, mua, ma, na, a, -1, ii);
+							std::cout << "z = " << zint[ii][jj] << " tau_11 = " << tau_11 << " tau_12 = " << tau_12 << " T = " << T << std::endl;
 							int_error[cnt_int + cnt_er] = abs(real(tau_11));
 							cnt_er += 1;
 						}

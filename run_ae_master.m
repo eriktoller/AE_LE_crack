@@ -12,7 +12,7 @@ clearvars
 close all
 clc
 %% ASSINING THE GLOBAL PARAMETERS
-sigma_11inf = .2;
+sigma_11inf = .2*0;
 nu = 0.3;
 G = 20e3/10000;
 kappa = 3 - 4 * nu;
@@ -24,7 +24,8 @@ kappa = 3 - 4 * nu;
 % z1a = [z1a,z1];
 % z2a = [z2a,z2];
 
-for IT = 1:1
+m_IT = [500:250:1000];
+for IT = 1:length(m_IT)
 % if NIT == 2
 %     xfrom = .1;
 %     xto = .45;
@@ -55,8 +56,8 @@ z2a = [complex(-.6,.3), complex(.5,.5)];
 % z2a = [complex(.6,.8),complex(-.6,.8)];
 % z1a = [complex(0,-.5),complex(.5,.25)];
 % z2a = [complex(0,.5),complex(-.5,.25)];
-z1a = [complex(.2,-.5),complex(-.5,.2)];
-z2a = [complex(.2,.5),complex(.5,.2)];
+% z1a = [complex(.2,-.5),complex(-.5,.2)];
+% z2a = [complex(.2,.5),complex(.5,.2)];
 % z1a = [complex(-.6,0),complex(0,-.6)];
 % z2a = [complex(.6,0),complex(0,.6)];
 % z1a = [complex(-.6,-.6),complex(-.6,.6*0)];
@@ -77,8 +78,8 @@ na = length(z1a);
 
 %% COEFFICIENTS FOR AE
 % Analaytic Element
-ma = 3^IT*0+10*IT;
-Na = ma*2*0+800;
+ma = m_IT(IT);
+Na = ma*2*0+2000;
 p = -1;
 
 cond = 1e-15;
@@ -324,107 +325,107 @@ disp(['Contour levels set to: ',num2str(lvs)])
 disp(' ')
 
 % Create the figures
-disp('figure ( 1/10)')
-create_figure()
-contour(x_vec, y_vec, grid_1,lvs,'blue','LineWidth',1.0);
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\sigma_{1}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure ( 2/10)')
-create_figure()
-contour(x_vec, y_vec, grid_2,lvs,'red','LineWidth',1.0);
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\sigma_{2}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure ( 3/10)')
-create_figure()
-contour(x_vec, y_vec, grid_11,lvs,'blue','LineWidth',1.0);
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\sigma_{11}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure ( 4/10)')
-create_figure()
-contour(x_vec, y_vec, grid_22,lvs,'red','LineWidth',1.0);
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\sigma_{22}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure ( 5/10)')
-create_figure()
-contour(x_vec, y_vec, grid_12,lvs,'green','LineWidth',1.0);
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\sigma_{12}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure ( 6/10)')
-create_figure()
-contour(x_vec, y_vec, theta_p,lvs,'red','LineWidth',1.0);
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\theta_{p}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure ( 7/10)')
-create_figure()
-for ii = 1:lvs_traj
-    p1 = plot(real(traj_1p(ii,:)),imag(traj_1p(ii,:)),'blue','LineWidth',1.0);
-    p2 = plot(real(traj_2p(ii,:)),imag(traj_2p(ii,:)),'red','LineWidth',1.0);
-end
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend([p1 p2], '$\sigma_{1}$','$\sigma_{2}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure ( 8/10)')
-create_figure()
-quiver(x_vecw, y_vecw, real(grid_w), -imag(grid_w),'blue');
-for ii = 1:Nw*2
-    p1 = plot(real(traj_w(ii,:)),imag(traj_w(ii,:)),'blue');
-end
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$w$')
-axis([x_vecw(1) x_vecw(end) y_vecw(1) y_vecw(end)])
-
-disp('figure ( 9/10)')
-create_figure()
-contour(x_vec, y_vec, grid_1,lvs,'blue','LineWidth',1.0);
-for ii = 1:lvs_traj
-    p1 = plot(real(traj_1p(ii,:)),imag(traj_1p(ii,:)),': blue','LineWidth',1.0);
-end
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\sigma_{1}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
-
-disp('figure (10/10)')
-create_figure()
-contour(x_vec, y_vec, grid_2,lvs,'red','LineWidth',1.0);
-for ii = 1:lvs_traj
-    p1 = plot(real(traj_2p(ii,:)),imag(traj_2p(ii,:)),': red','LineWidth',1.0);
-end
-for ii = 1:na
-    Plot_line(z1a(ii),z2a(ii),'black')
-end
-legend('$\sigma_{2}$')
-axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% disp('figure ( 1/10)')
+% create_figure()
+% contour(x_vec, y_vec, grid_1,lvs,'blue','LineWidth',1.0);
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\sigma_{1}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure ( 2/10)')
+% create_figure()
+% contour(x_vec, y_vec, grid_2,lvs,'red','LineWidth',1.0);
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\sigma_{2}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure ( 3/10)')
+% create_figure()
+% contour(x_vec, y_vec, grid_11,lvs,'blue','LineWidth',1.0);
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\sigma_{11}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure ( 4/10)')
+% create_figure()
+% contour(x_vec, y_vec, grid_22,lvs,'red','LineWidth',1.0);
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\sigma_{22}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure ( 5/10)')
+% create_figure()
+% contour(x_vec, y_vec, grid_12,lvs,'green','LineWidth',1.0);
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\sigma_{12}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure ( 6/10)')
+% create_figure()
+% contour(x_vec, y_vec, theta_p,lvs,'red','LineWidth',1.0);
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\theta_{p}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure ( 7/10)')
+% create_figure()
+% for ii = 1:lvs_traj
+%     p1 = plot(real(traj_1p(ii,:)),imag(traj_1p(ii,:)),'blue','LineWidth',1.0);
+%     p2 = plot(real(traj_2p(ii,:)),imag(traj_2p(ii,:)),'red','LineWidth',1.0);
+% end
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend([p1 p2], '$\sigma_{1}$','$\sigma_{2}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure ( 8/10)')
+% create_figure()
+% quiver(x_vecw, y_vecw, real(grid_w), -imag(grid_w),'blue');
+% for ii = 1:Nw*2
+%     p1 = plot(real(traj_w(ii,:)),imag(traj_w(ii,:)),'blue');
+% end
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$w$')
+% axis([x_vecw(1) x_vecw(end) y_vecw(1) y_vecw(end)])
+% 
+% disp('figure ( 9/10)')
+% create_figure()
+% contour(x_vec, y_vec, grid_1,lvs,'blue','LineWidth',1.0);
+% for ii = 1:lvs_traj
+%     p1 = plot(real(traj_1p(ii,:)),imag(traj_1p(ii,:)),': blue','LineWidth',1.0);
+% end
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\sigma_{1}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
+% 
+% disp('figure (10/10)')
+% create_figure()
+% contour(x_vec, y_vec, grid_2,lvs,'red','LineWidth',1.0);
+% for ii = 1:lvs_traj
+%     p1 = plot(real(traj_2p(ii,:)),imag(traj_2p(ii,:)),': red','LineWidth',1.0);
+% end
+% for ii = 1:na
+%     Plot_line(z1a(ii),z2a(ii),'black')
+% end
+% legend('$\sigma_{2}$')
+% axis([x_vec(1) x_vec(end) y_vec(1) y_vec(end)])
 
 
 %%
@@ -469,7 +470,7 @@ disp(' ')
 disp(['Data saved as: ','"',str_file,'"'])
 end
 figure
-semilogy(IT_vec, (error_medre),'blue *-',IT_vec, (error_medim),'red',...
+semilogy(IT_vec, (error_medre),'blue',IT_vec, (error_medim),'red',...
     IT_vec, (error_med),'black',IT_vec, (error_meandre),'blue-.',...
     IT_vec, (error_meandim),'red-.',IT_vec, (error_meand),'black-.')
 %legend('$|\tau^{11}|$','$|t_n-p|$','$|t_s|$')
