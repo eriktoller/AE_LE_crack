@@ -6,7 +6,7 @@ The program includes the Cartesian stress field (<img src="https://latex.codecog
 This program has been developed using *MATLAB* and *Microsoft Visual Stuido*, while only the `.m`-, `.cpp`- and `.exe`-files are included in the repository. The solution also uses the Eigen library (Guennebaud & Jacob, 2010).
 
 ## Instructions
-The plots are generated using the MATLAB program `run_ae_master.m`. The script calls the C++ program which solves the system and plots the results. To run teh program simply run the MATLAB script.
+The plots are generated using the MATLAB program `run_ae_master.m`. The script calls the C++ program which solves the system and plots the results. To run the program simply run the MATLAB script.
 
 ## Input data
 This list contains all the definitions of the user input data defined in `run_ae_master.m`. These are the model properties:
