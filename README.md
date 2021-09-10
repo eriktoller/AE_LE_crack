@@ -3,7 +3,7 @@ An analytic element for intersecting cracks in a linear elastic half-space. A pr
 
 The program includes the Cartesian stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{11}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{22}"/>  & <img src="https://latex.codecogs.com/gif.latex?\sigma_{12}"/> ), the principal stress field (<img src="https://latex.codecogs.com/gif.latex?\sigma_{1}"/> , <img src="https://latex.codecogs.com/gif.latex?\sigma_{2}"/>  & <img src="https://latex.codecogs.com/gif.latex?\theta_{p}"/> ) and the principal stress trajectories. Also, it computes the displacement filed <img src="https://latex.codecogs.com/gif.latex?w"/> and the displacement trajectories. For a given resolution and coordinates. The results are saved as a `.mat`-file as `simulation_[todays date]_[version].mat`, the program automatically save as the current date and assigns the version.
 
-This program has been developed using *MATLAB* and *Microsoft Visual Stuido*, while only the `.m`-, `.cpp`- and `.exe`-files are included in the repository. The solution also uses the Eigen library (Guennebaud & Jacob, 2010).
+This program has been developed using *MATLAB* and *Microsoft Visual Stuido*; only the `.m`-, `.cpp`- and `.exe`-files are included in the repository. The solution also uses the Eigen library (Guennebaud & Jacob, 2010).
 
 ## Instructions
 The plots are generated using the MATLAB program `run_ae_master.m`. The script calls the C++ program which solves the system and plots the results. To run the program simply run the MATLAB script.
